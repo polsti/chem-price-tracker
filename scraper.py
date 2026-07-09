@@ -1,6 +1,7 @@
 import asyncio
 import json
 from playwright.async_api import async_playwright
+from db import init_db, insert_rows
 
 CHEMICALS = [
     {"id": "449",       "name": "acetone"},
@@ -47,15 +48,17 @@ async def scrape_one(browser, chemical):
             print(f"  [{chem_name}] retrying (attempt {attempt}/{MAX_RETRIES})...")
 
         try:
-            await page.goto(url, timeout=PAGE_TIMEOUT)
+            # domcontentloaded fires as soon as HTML is parsed —
+            # we don't need images/fonts/ads to finish loading,
+            # just early enough for JS to trigger the XHR price call
+            await page.goto(url, timeout=PAGE_TIMEOUT, wait_until="domcontentloaded")
         except Exception as e:
-            print(f"  [{chem_name}] page load failed: {e}")
-            await page.close()
-            if attempt < MAX_RETRIES:
-                await asyncio.sleep(WAIT_AFTER_FAIL)
-            continue
+            # page timed out — but the XHR might have fired already
+            # so don't close yet, fall through and check result first
+            print(f"  [{chem_name}] page load timed out, checking if data was captured...")
 
         # wait up to 20 seconds for the price response
+        # (runs whether goto succeeded or timed out)
         for _ in range(40):
             if result is not None:
                 break
@@ -64,7 +67,7 @@ async def scrape_one(browser, chemical):
         await page.close()
 
         if result is None:
-            print(f"  [{chem_name}] price response never arrived")
+            print(f"  [{chem_name}] no data captured")
             if attempt < MAX_RETRIES:
                 await asyncio.sleep(WAIT_AFTER_FAIL)
             continue
@@ -82,6 +85,7 @@ async def scrape_one(browser, chemical):
 
 
 async def scrape_all():
+    init_db()
     all_results = []
 
     async with async_playwright() as p:
@@ -91,30 +95,18 @@ async def scrape_all():
             data = await scrape_one(browser, chemical)
             if data:
                 all_results.append(data)
-            # pause between chemicals — avoid triggering rate limiting
+                source_url = BASE_URL.format(id=chemical["id"])
+                insert_rows(
+                    chemical_id=data["chemical_id"],
+                    chemical_name=data["chemical_name"],
+                    rows=data["rows"],
+                    source_url=source_url,
+                )
             await asyncio.sleep(4)
 
         await browser.close()
 
-    # print summary
-    print("\n" + "=" * 60)
-    print("RESULTS SUMMARY")
-    print("=" * 60)
-    for result in all_results:
-        print(f"\n{result['chemical_name']} (id={result['chemical_id']})")
-        print(f"{'Date':<14} {'Price':>10} {'Change':>10} {'Change%':>10} {'7d Avg':>10}")
-        print("-" * 58)
-        for row in result["rows"]:
-            print(
-                f"{row['dateRange']:<14}"
-                f"{row['mdataValue']:>10}"
-                f"{row['change']:>10}"
-                f"{row['changeRate']:>10}"
-                f"{row['ndaysAvgPrice']:>10}"
-            )
-
     print(f"\nDone. Scraped {len(all_results)}/{len(CHEMICALS)} chemicals successfully.")
-    return all_results
 
 
 asyncio.run(scrape_all())
