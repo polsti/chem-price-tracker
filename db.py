@@ -33,6 +33,38 @@ def init_db():
     print(f"Database ready: {DB_PATH}")
 
 
+def get_latest_all():
+    # returns the most recent price row for each chemical
+    conn = get_connection()
+    rows = conn.execute("""
+        SELECT chemical_id, chemical_name, date, price, change_abs, change_pct, avg_price_7d
+        FROM chemical_prices
+        WHERE (chemical_id, date) IN (
+            SELECT chemical_id, MAX(date)
+            FROM chemical_prices
+            GROUP BY chemical_id
+        )
+        ORDER BY chemical_name
+    """).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def get_history(chemical_id, limit=30):
+    # returns last N days of prices for one chemical, oldest first
+    conn = get_connection()
+    rows = conn.execute("""
+        SELECT chemical_id, chemical_name, date, price, change_abs, change_pct, avg_price_7d
+        FROM chemical_prices
+        WHERE chemical_id = ?
+        ORDER BY date DESC
+        LIMIT ?
+    """, (chemical_id, limit)).fetchall()
+    conn.close()
+    # reverse so oldest is first (better for charts)
+    return [dict(row) for row in reversed(rows)]
+
+
 def insert_rows(chemical_id, chemical_name, rows, source_url):
     conn = get_connection()
     scraped_at = datetime.now().isoformat()
