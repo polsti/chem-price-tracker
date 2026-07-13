@@ -1,7 +1,15 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from db import get_latest_all, get_history
 
 app = FastAPI(title="Chemical Price Tracker API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Vite's default port
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
