@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import PriceChart from "./components/PriceChart";
 import CompareChart from "./components/CompareChart";
+import ExportButton from "./components/ExportButton";
 import "./App.css";
 
 const API = "http://localhost:8000";
@@ -53,8 +54,13 @@ export default function App() {
 
   return (
     <div className="container">
-      <h1>Chemical Price Tracker</h1>
-      <p className="subtitle">Click a row to see price history chart</p>
+      <div className="page-header">
+        <div>
+          <h1>Chemical Price Tracker</h1>
+          <p className="subtitle">Click a row to see price history chart</p>
+        </div>
+        <ExportButton year={new Date().getFullYear()} month={new Date().getMonth() + 1} />
+      </div>
 
       <table>
         <thead>

@@ -65,6 +65,56 @@ def get_history(chemical_id, limit=30):
     return [dict(row) for row in reversed(rows)]
 
 
+def get_monthly_summary(year, month):
+    # returns one summary row per chemical for the given month
+    # e.g. year=2026, month=7 → all rows from 2026-07-01 to 2026-07-31
+    period = f"{year}-{month:02d}"
+    conn = get_connection()
+    rows = conn.execute("""
+        SELECT
+            chemical_id,
+            chemical_name,
+            MIN(price)  AS min_price,
+            MAX(price)  AS max_price,
+            ROUND(AVG(price), 2) AS avg_price,
+            MIN(date)   AS first_date,
+            MAX(date)   AS last_date,
+            COUNT(*)    AS trading_days
+        FROM chemical_prices
+        WHERE strftime('%Y-%m', date) = ?
+        GROUP BY chemical_id, chemical_name
+        ORDER BY chemical_name
+    """, (period,)).fetchall()
+
+    result = []
+    for row in rows:
+        row = dict(row)
+        # also fetch the actual price on first and last date for % change
+        first = conn.execute("""
+            SELECT price FROM chemical_prices
+            WHERE chemical_id = ? AND date = ?
+        """, (row["chemical_id"], row["first_date"])).fetchone()
+
+        last = conn.execute("""
+            SELECT price FROM chemical_prices
+            WHERE chemical_id = ? AND date = ?
+        """, (row["chemical_id"], row["last_date"])).fetchone()
+
+        row["first_price"] = first["price"] if first else None
+        row["last_price"]  = last["price"]  if last  else None
+
+        if row["first_price"] and row["first_price"] != 0:
+            change = ((row["last_price"] - row["first_price"]) / row["first_price"]) * 100
+            row["change_pct"] = round(change, 2)
+        else:
+            row["change_pct"] = None
+
+        result.append(row)
+
+    conn.close()
+    return result
+
+
 def insert_rows(chemical_id, chemical_name, rows, source_url):
     conn = get_connection()
     scraped_at = datetime.now().isoformat()
