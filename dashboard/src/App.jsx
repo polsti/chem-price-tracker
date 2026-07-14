@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import PriceChart from "./components/PriceChart";
+import CompareChart from "./components/CompareChart";
 import "./App.css";
 
 const API = "http://localhost:8000";
@@ -96,6 +97,8 @@ export default function App() {
           onPeriodChange={setActiveDays}
         />
       )}
+
+      <CompareChart chemicals={chemicals} />
     </div>
   );
 }

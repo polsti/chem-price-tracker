@@ -127,3 +127,46 @@ tbody tr.active {
   border-color: #4fc3f7;
   font-weight: 600;
 }
+
+.compare-box {
+  margin-top: 48px;
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.compare-box h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.compare-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 20px;
+}
+
+.compare-toggle {
+  background: #0f0f0f;
+  color: #aaa;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-transform: capitalize;
+}
+
+.compare-toggle:hover {
+  border-color: #555;
+  color: #fff;
+}
+
+.compare-hint {
+  color: #555;
+  font-size: 13px;
+  margin-top: 12px;
+}
