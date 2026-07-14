@@ -5,13 +5,14 @@ import "./App.css";
 const API = "http://localhost:8000";
 
 export default function App() {
-  const [chemicals, setChemicals] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [chemicals, setChemicals]   = useState([]);
+  const [selected, setSelected]     = useState(null);
+  const [history, setHistory]       = useState([]);
+  const [activeDays, setActiveDays] = useState(30);   // default period: 1 month
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState(null);
 
-  // runs once on page load — fetches latest prices for all chemicals
+  // fetch latest prices for all chemicals on page load
   useEffect(() => {
     fetch(`${API}/chemicals`)
       .then(res => res.json())
@@ -25,14 +26,20 @@ export default function App() {
       });
   }, []);
 
-  // runs when user clicks a chemical — fetches its 30-day price history
+  // re-fetch history whenever selected chemical OR active period changes
   useEffect(() => {
     if (!selected) return;
-    fetch(`${API}/chemicals/${selected.chemical_id}/history?days=30`)
+    fetch(`${API}/chemicals/${selected.chemical_id}/history?days=${activeDays}`)
       .then(res => res.json())
       .then(data => setHistory(data))
       .catch(() => setHistory([]));
-  }, [selected]);
+  }, [selected, activeDays]);  // ← both dependencies listed here
+
+  const handleSelectChemical = (chem) => {
+    setSelected(chem);
+    setActiveDays(30);   // reset to 1 month when switching to a different chemical
+    setHistory([]);
+  };
 
   const changeColor = (val) => {
     if (val > 0) return "positive";
@@ -63,7 +70,7 @@ export default function App() {
           {chemicals.map(chem => (
             <tr
               key={chem.chemical_id}
-              onClick={() => setSelected(chem)}
+              onClick={() => handleSelectChemical(chem)}
               className={selected?.chemical_id === chem.chemical_id ? "active" : ""}
             >
               <td>{chem.chemical_name}</td>
@@ -82,7 +89,12 @@ export default function App() {
       </table>
 
       {selected && (
-        <PriceChart data={history} chemicalName={selected.chemical_name} />
+        <PriceChart
+          data={history}
+          chemicalName={selected.chemical_name}
+          activeDays={activeDays}
+          onPeriodChange={setActiveDays}
+        />
       )}
     </div>
   );

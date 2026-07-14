@@ -92,3 +92,38 @@ tbody tr.active {
 .error {
   color: #f44336;
 }
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.period-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.period-btn {
+  background: #2a2a2a;
+  color: #aaa;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.period-btn:hover {
+  background: #333;
+  color: #fff;
+}
+
+.period-btn.active {
+  background: #4fc3f7;
+  color: #000;
+  border-color: #4fc3f7;
+  font-weight: 600;
+}

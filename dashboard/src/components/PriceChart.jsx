@@ -2,12 +2,35 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 
-export default function PriceChart({ data, chemicalName }) {
+const PERIODS = [
+  { label: "7 days",   days: 7   },
+  { label: "1 month",  days: 30  },
+  { label: "3 months", days: 90  },
+  { label: "1 year",   days: 365 },
+];
+
+export default function PriceChart({ data, chemicalName, activeDays, onPeriodChange }) {
   if (!data || data.length === 0) return null;
 
   return (
     <div className="chart-box">
-      <h2>{chemicalName} — price history</h2>
+      <div className="chart-header">
+        <h2>{chemicalName} — price history</h2>
+
+        {/* period buttons */}
+        <div className="period-buttons">
+          {PERIODS.map(p => (
+            <button
+              key={p.days}
+              onClick={() => onPeriodChange(p.days)}
+              className={activeDays === p.days ? "period-btn active" : "period-btn"}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
