@@ -43,3 +43,20 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper.py
+
+      # Fails (exits non-zero) if today's price is missing for any chemical —
+      # that failure is what the next step below reacts to.
+      - name: Check today's data actually landed
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python check_freshness.py
+
+      # Only runs if an earlier step in this job failed (the scrape itself,
+      # or the freshness check above) — silent on a normal successful day.
+      - name: Send Telegram alert on failure
+        if: failure()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="Chemical price tracker: today's scrape run failed. Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
