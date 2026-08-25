@@ -9,7 +9,7 @@ import sys
 from datetime import date
 from db import get_latest_all
 
-EXPECTED_CHEMICALS = 99
+EXPECTED_CHEMICALS = 8  # number of chemicals we scrape
 
 
 def main():
