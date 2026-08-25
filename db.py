@@ -1,153 +1,136 @@
-import sqlite3
+import os
 from datetime import datetime
+from dotenv import load_dotenv
+from supabase import create_client
 
-DB_PATH = "prices.db"
+load_dotenv()  # reads SUPABASE_URL / SUPABASE_KEY from .env into the environment
+
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 
 
-def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    # makes rows behave like dictionaries: row["price"] instead of row[2]
-    conn.row_factory = sqlite3.Row
-    return conn
+def get_client():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 def init_db():
-    conn = get_connection()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS chemical_prices (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            chemical_id  TEXT NOT NULL,
-            chemical_name TEXT NOT NULL,
-            date         DATE NOT NULL,
-            price        REAL,
-            change_abs   REAL,
-            change_pct   REAL,
-            avg_price_7d REAL,
-            scraped_at   DATETIME NOT NULL,
-            source_url   TEXT,
-            UNIQUE(chemical_id, date)
-        )
-    """)
-    conn.commit()
-    conn.close()
-    print(f"Database ready: {DB_PATH}")
+    # The table already exists on Supabase (created once, by hand, via the
+    # SQL editor). Real databases are changed deliberately, not recreated
+    # automatically on every run, so there's nothing to do here — this
+    # function is kept only so scraper.py's existing init_db() call still works.
+    print("Using Supabase — table already exists, nothing to initialize.")
 
 
 def get_latest_all():
     # returns the most recent price row for each chemical
-    conn = get_connection()
-    rows = conn.execute("""
-        SELECT chemical_id, chemical_name, date, price, change_abs, change_pct, avg_price_7d
-        FROM chemical_prices
-        WHERE (chemical_id, date) IN (
-            SELECT chemical_id, MAX(date)
-            FROM chemical_prices
-            GROUP BY chemical_id
-        )
-        ORDER BY chemical_name
-    """).fetchall()
-    conn.close()
-    return [dict(row) for row in rows]
+    client = get_client()
+    rows = client.table("chemical_prices") \
+        .select("chemical_id, chemical_name, date, price, change_abs, change_pct, avg_price_7d") \
+        .order("date", desc=True) \
+        .execute().data
+
+    # Supabase gives back every row, not "the latest per chemical" —
+    # since we sorted newest-first, the first time we see a given
+    # chemical_id is its most recent row.
+    latest = {}
+    for row in rows:
+        if row["chemical_id"] not in latest:
+            latest[row["chemical_id"]] = row
+
+    result = list(latest.values())
+    result.sort(key=lambda r: r["chemical_name"])
+    return result
 
 
 def get_history(chemical_id, limit=30):
     # returns last N days of prices for one chemical, oldest first
-    conn = get_connection()
-    rows = conn.execute("""
-        SELECT chemical_id, chemical_name, date, price, change_abs, change_pct, avg_price_7d
-        FROM chemical_prices
-        WHERE chemical_id = ?
-        ORDER BY date DESC
-        LIMIT ?
-    """, (chemical_id, limit)).fetchall()
-    conn.close()
-    # reverse so oldest is first (better for charts)
-    return [dict(row) for row in reversed(rows)]
+    client = get_client()
+    rows = client.table("chemical_prices") \
+        .select("chemical_id, chemical_name, date, price, change_abs, change_pct, avg_price_7d") \
+        .eq("chemical_id", chemical_id) \
+        .order("date", desc=True) \
+        .limit(limit) \
+        .execute().data
+
+    return list(reversed(rows))  # oldest first, better for charts
 
 
 def get_monthly_summary(year, month):
     # returns one summary row per chemical for the given month
-    # e.g. year=2026, month=7 → all rows from 2026-07-01 to 2026-07-31
-    period = f"{year}-{month:02d}"
-    conn = get_connection()
-    rows = conn.execute("""
-        SELECT
-            chemical_id,
-            chemical_name,
-            MIN(price)  AS min_price,
-            MAX(price)  AS max_price,
-            ROUND(AVG(price), 2) AS avg_price,
-            MIN(date)   AS first_date,
-            MAX(date)   AS last_date,
-            COUNT(*)    AS trading_days
-        FROM chemical_prices
-        WHERE strftime('%Y-%m', date) = ?
-        GROUP BY chemical_id, chemical_name
-        ORDER BY chemical_name
-    """, (period,)).fetchall()
+    client = get_client()
+    start = f"{year}-{month:02d}-01"
+    # first day of the *next* month — used as an exclusive upper bound
+    if month == 12:
+        end = f"{year + 1}-01-01"
+    else:
+        end = f"{year}-{month + 1:02d}-01"
+
+    rows = client.table("chemical_prices") \
+        .select("chemical_id, chemical_name, date, price") \
+        .gte("date", start) \
+        .lt("date", end) \
+        .order("date") \
+        .execute().data
+
+    # Group by chemical in plain Python — at this data size it's simpler
+    # and clearer than reaching for Postgres-specific aggregate syntax.
+    by_chemical = {}
+    for row in rows:
+        by_chemical.setdefault(row["chemical_id"], []).append(row)
 
     result = []
-    for row in rows:
-        row = dict(row)
-        # also fetch the actual price on first and last date for % change
-        first = conn.execute("""
-            SELECT price FROM chemical_prices
-            WHERE chemical_id = ? AND date = ?
-        """, (row["chemical_id"], row["first_date"])).fetchone()
+    for chem_id, chem_rows in by_chemical.items():
+        prices = [r["price"] for r in chem_rows if r["price"] is not None]
+        first, last = chem_rows[0], chem_rows[-1]
 
-        last = conn.execute("""
-            SELECT price FROM chemical_prices
-            WHERE chemical_id = ? AND date = ?
-        """, (row["chemical_id"], row["last_date"])).fetchone()
+        change_pct = None
+        if first["price"]:
+            change_pct = round((last["price"] - first["price"]) / first["price"] * 100, 2)
 
-        row["first_price"] = first["price"] if first else None
-        row["last_price"]  = last["price"]  if last  else None
+        result.append({
+            "chemical_id": chem_id,
+            "chemical_name": chem_rows[0]["chemical_name"],
+            "min_price": min(prices) if prices else None,
+            "max_price": max(prices) if prices else None,
+            "avg_price": round(sum(prices) / len(prices), 2) if prices else None,
+            "first_date": first["date"],
+            "last_date": last["date"],
+            "trading_days": len(chem_rows),
+            "first_price": first["price"],
+            "last_price": last["price"],
+            "change_pct": change_pct,
+        })
 
-        if row["first_price"] and row["first_price"] != 0:
-            change = ((row["last_price"] - row["first_price"]) / row["first_price"]) * 100
-            row["change_pct"] = round(change, 2)
-        else:
-            row["change_pct"] = None
-
-        result.append(row)
-
-    conn.close()
+    result.sort(key=lambda r: r["chemical_name"])
     return result
 
 
 def insert_rows(chemical_id, chemical_name, rows, source_url):
-    conn = get_connection()
+    client = get_client()
     scraped_at = datetime.now().isoformat()
-    inserted = 0
-    skipped = 0
 
+    payload = []
     for row in rows:
         # parse "0.95%" → 0.95
         change_pct_raw = row.get("changeRate", "0")
         change_pct = float(change_pct_raw.replace("%", "")) if change_pct_raw else None
 
-        try:
-            conn.execute("""
-                INSERT INTO chemical_prices
-                    (chemical_id, chemical_name, date, price, change_abs, change_pct,
-                     avg_price_7d, scraped_at, source_url)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                chemical_id,
-                chemical_name,
-                row["dateRange"],
-                float(row["mdataValue"]) if row["mdataValue"] else None,
-                float(row["change"]) if row["change"] else None,
-                change_pct,
-                float(row["ndaysAvgPrice"]) if row["ndaysAvgPrice"] else None,
-                scraped_at,
-                source_url,
-            ))
-            inserted += 1
-        except sqlite3.IntegrityError:
-            # UNIQUE(chemical_id, date) violation — row already exists, skip it
-            skipped += 1
+        payload.append({
+            "chemical_id": chemical_id,
+            "chemical_name": chemical_name,
+            "date": row["dateRange"],
+            "price": float(row["mdataValue"]) if row["mdataValue"] else None,
+            "change_abs": float(row["change"]) if row["change"] else None,
+            "change_pct": change_pct,
+            "avg_price_7d": float(row["ndaysAvgPrice"]) if row["ndaysAvgPrice"] else None,
+            "scraped_at": scraped_at,
+            "source_url": source_url,
+        })
 
-    conn.commit()
-    conn.close()
-    print(f"  [{chemical_name}] inserted {inserted}, skipped {skipped} duplicate(s)")
+    # upsert = insert, but overwrite instead of erroring if a row for this
+    # (chemical_id, date) already exists — safe to run more than once per day.
+    result = client.table("chemical_prices").upsert(
+        payload, on_conflict="chemical_id,date"
+    ).execute()
+
+    print(f"  [{chemical_name}] upserted {len(result.data)} row(s)")
