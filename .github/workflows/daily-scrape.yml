@@ -1,0 +1,45 @@
+name: Daily chemical price scrape
+
+on:
+  # Runs automatically every day at 05:00 UTC = 08:00 Kyiv time (summer/EEST).
+  # In winter (EET, UTC+2) this will effectively fire at 07:00 Kyiv time —
+  # GitHub's schedule doesn't know about daylight saving, so this may need
+  # a manual one-hour nudge twice a year if the exact hour matters.
+  schedule:
+    - cron: '0 5 * * *'
+  # Adds a manual "Run workflow" button on GitHub, so we can trigger a run
+  # on demand to test, instead of waiting for the next scheduled time.
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      # Copies this repo's code onto the fresh GitHub-provided computer —
+      # without this step, scraper.py/db.py wouldn't exist there at all.
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      # Playwright needs an actual browser (Chromium) to load the page —
+      # --with-deps also installs the OS-level libraries Ubuntu doesn't
+      # ship by default (fonts, graphics libs, etc.) that Chromium needs to run.
+      - name: Install Playwright's browser
+        run: playwright install --with-deps chromium
+
+      # SUPABASE_URL / SUPABASE_KEY come from GitHub's encrypted Secrets
+      # (added via the repo's Settings page, not committed anywhere) and
+      # are injected here as environment variables — db.py reads them the
+      # same way it does locally via os.environ, so no code changes needed.
+      - name: Run the scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper.py
