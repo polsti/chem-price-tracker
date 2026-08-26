@@ -1,0 +1,36 @@
+name: Investigate chemical update times (TEMPORARY)
+
+# This workflow exists only to figure out what time each chemical's price
+# actually updates on sci99.com. It is NOT part of daily production —
+# once we have 1-2 days of data in the price_check_log table, this file
+# should be deleted (or disabled) so we stop checking the site every hour
+# forever for no reason.
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # every hour, on the hour, UTC
+  workflow_dispatch:        # lets us trigger it manually too
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright's browser
+        run: playwright install --with-deps chromium
+
+      - name: Check current update time for each chemical
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python check_update_time.py
