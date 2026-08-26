@@ -4,6 +4,7 @@ import CompareChart from "./components/CompareChart";
 import ExportButton from "./components/ExportButton";
 import Login from "./components/Login";
 import { supabase, authFetch } from "./supabaseClient";
+import { displayName } from "./chemicalNames";
 import "./App.css";
 
 // Falls back to localhost for local development; set VITE_API_URL in
@@ -117,7 +118,7 @@ export default function App() {
               onClick={() => handleSelectChemical(chem)}
               className={selected?.chemical_id === chem.chemical_id ? "active" : ""}
             >
-              <td>{chem.chemical_name}</td>
+              <td>{displayName(chem)}</td>
               <td>{chem.date}</td>
               <td>{chem.price.toLocaleString()}</td>
               <td className={changeColor(chem.change_abs)}>
@@ -135,7 +136,7 @@ export default function App() {
       {selected && (
         <PriceChart
           data={history}
-          chemicalName={selected.chemical_name}
+          chemicalName={displayName(selected)}
           activeDays={activeDays}
           onPeriodChange={setActiveDays}
         />

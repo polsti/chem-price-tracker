@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { authFetch } from "../supabaseClient";
+import { displayName } from "../chemicalNames";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -16,9 +17,13 @@ async function fetchSummary(year, month) {
   return res.json();
 }
 
-function buildRows(chemicals) {
+// translateNames=false → PDF: jsPDF's default fonts can't render Cyrillic
+// characters, so the PDF export stays in English on purpose.
+// translateNames=true  → Excel: Unicode text works natively, so the Excel
+// export shows the Ukrainian chemical names.
+function buildRows(chemicals, translateNames = false) {
   return chemicals.map(c => [
-    c.chemical_name,
+    translateNames ? displayName(c) : c.chemical_name,
     c.first_date,
     c.last_date,
     c.trading_days,
@@ -68,7 +73,7 @@ export default function ExportButton({ year, month }) {
   const exportExcel = async () => {
     try {
       const data = await fetchSummary(year, month);
-      const rows = buildRows(data.chemicals);
+      const rows = buildRows(data.chemicals, true);
 
       const ws = XLSX.utils.aoa_to_sheet([HEADERS, ...rows]);
       const wb = XLSX.utils.book_new();

@@ -77,7 +77,6 @@ tbody tr.active {
   font-weight: 600;
   margin-bottom: 20px;
   color: #e0e0e0;
-  text-transform: capitalize;
 }
 
 .center {
@@ -157,7 +156,6 @@ tbody tr.active {
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s;
-  text-transform: capitalize;
 }
 
 .compare-toggle:hover {

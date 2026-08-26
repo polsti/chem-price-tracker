@@ -4,6 +4,7 @@ import {
   Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 import { authFetch } from "../supabaseClient";
+import { displayName } from "../chemicalNames";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -54,7 +55,7 @@ export default function CompareChart({ chemicals }) {
       selected.map(chem =>
         authFetch(`${API}/chemicals/${chem.chemical_id}/history?days=${days}`)
           .then(res => res.json())
-          .then(data => ({ name: chem.chemical_name, data }))
+          .then(data => ({ name: displayName(chem), data }))
       )
     ).then(results => {
       // merge all results into one array keyed by date
@@ -104,7 +105,7 @@ export default function CompareChart({ chemicals }) {
               background: "#1a1a1a",
             } : {}}
           >
-            {chem.chemical_name}
+            {displayName(chem)}
           </button>
         ))}
       </div>
@@ -138,7 +139,7 @@ export default function CompareChart({ chemicals }) {
                 <Line
                   key={chem.chemical_id}
                   type="monotone"
-                  dataKey={chem.chemical_name}
+                  dataKey={displayName(chem)}
                   stroke={COLORS[i]}
                   strokeWidth={2}
                   strokeDasharray={DASHES[i]}
