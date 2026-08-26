@@ -7,7 +7,10 @@ app = FastAPI(title="Chemical Price Tracker API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite's default port
+    allow_origins=[
+        "http://localhost:5173",              # local dev (npm run dev)
+        "https://chem-price-tracker.vercel.app",  # hosted dashboard
+    ],
     allow_methods=["GET"],
     allow_headers=["*"],
 )
