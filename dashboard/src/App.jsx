@@ -4,7 +4,9 @@ import CompareChart from "./components/CompareChart";
 import ExportButton from "./components/ExportButton";
 import "./App.css";
 
-const API = "http://localhost:8000";
+// Falls back to localhost for local development; set VITE_API_URL in
+// Vercel's project settings to point the deployed site at the real backend.
+const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export default function App() {
   const [chemicals, setChemicals]   = useState([]);
