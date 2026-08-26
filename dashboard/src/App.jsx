@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import PriceChart from "./components/PriceChart";
 import CompareChart from "./components/CompareChart";
 import ExportButton from "./components/ExportButton";
+import Login from "./components/Login";
+import { supabase, authFetch } from "./supabaseClient";
 import "./App.css";
 
 // Falls back to localhost for local development; set VITE_API_URL in
@@ -9,6 +11,11 @@ import "./App.css";
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export default function App() {
+  // session === undefined  → we haven't checked yet (show nothing/a loader)
+  // session === null       → checked, nobody's logged in (show Login)
+  // session === {...}      → logged in (show the dashboard)
+  const [session, setSession] = useState(undefined);
+
   const [chemicals, setChemicals]   = useState([]);
   const [selected, setSelected]     = useState(null);
   const [history, setHistory]       = useState([]);
@@ -16,9 +23,25 @@ export default function App() {
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
 
-  // fetch latest prices for all chemicals on page load
+  // On page load: check if there's already a logged-in session (e.g. from
+  // a previous visit). Then keep listening for login/logout events so the
+  // screen updates immediately without needing a page refresh.
   useEffect(() => {
-    fetch(`${API}/chemicals`)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  // fetch latest prices for all chemicals — only once we know who's logged in
+  useEffect(() => {
+    if (!session) return;
+    authFetch(`${API}/chemicals`)
       .then(res => res.json())
       .then(data => {
         setChemicals(data);
@@ -28,12 +51,12 @@ export default function App() {
         setError("Cannot reach API. Make sure the backend is running on port 8000.");
         setLoading(false);
       });
-  }, []);
+  }, [session]);
 
   // re-fetch history whenever selected chemical OR active period changes
   useEffect(() => {
     if (!selected) return;
-    fetch(`${API}/chemicals/${selected.chemical_id}/history?days=${activeDays}`)
+    authFetch(`${API}/chemicals/${selected.chemical_id}/history?days=${activeDays}`)
       .then(res => res.json())
       .then(data => setHistory(data))
       .catch(() => setHistory([]));
@@ -51,6 +74,12 @@ export default function App() {
     return "";
   };
 
+  // Still checking whether a session already exists (page just loaded)
+  if (session === undefined) return <div className="center">Loading...</div>;
+
+  // Checked, and nobody's logged in — show the login form instead of any data
+  if (session === null) return <Login />;
+
   if (loading) return <div className="center">Loading...</div>;
   if (error)   return <div className="center error">{error}</div>;
 
@@ -61,7 +90,13 @@ export default function App() {
           <h1>Chemical Price Tracker</h1>
           <p className="subtitle">Click a row to see price history chart</p>
         </div>
-        <ExportButton year={new Date().getFullYear()} month={new Date().getMonth() + 1} />
+        <div className="header-actions">
+          <span className="logged-in-as">{session.user.email}</span>
+          <button className="logout-btn" onClick={() => supabase.auth.signOut()}>
+            Log out
+          </button>
+          <ExportButton year={new Date().getFullYear()} month={new Date().getMonth() + 1} />
+        </div>
       </div>
 
       <table>

@@ -3,6 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer
 } from "recharts";
+import { authFetch } from "../supabaseClient";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -51,7 +52,7 @@ export default function CompareChart({ chemicals }) {
 
     Promise.all(
       selected.map(chem =>
-        fetch(`${API}/chemicals/${chem.chemical_id}/history?days=${days}`)
+        authFetch(`${API}/chemicals/${chem.chemical_id}/history?days=${days}`)
           .then(res => res.json())
           .then(data => ({ name: chem.chemical_name, data }))
       )

@@ -205,3 +205,73 @@ tbody tr.active {
   background: #2a2a2a;
   border-color: #555;
 }
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.logged-in-as {
+  color: #888;
+  font-size: 13px;
+}
+
+.logout-btn {
+  background: #1a1a1a;
+  color: #e0e0e0;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.logout-btn:hover {
+  background: #2a2a2a;
+  border-color: #555;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 280px;
+  text-align: center;
+}
+
+.login-form h1 {
+  font-size: 22px;
+}
+
+.login-form input {
+  background: #1a1a1a;
+  color: #e0e0e0;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.login-form input:focus {
+  outline: none;
+  border-color: #4fc3f7;
+}
+
+.login-form button {
+  background: #4fc3f7;
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.login-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

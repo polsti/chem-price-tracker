@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { authFetch } from "../supabaseClient";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -10,7 +11,7 @@ const MONTHS = [
 ];
 
 async function fetchSummary(year, month) {
-  const res = await fetch(`${API}/export/summary?year=${year}&month=${month}`);
+  const res = await authFetch(`${API}/export/summary?year=${year}&month=${month}`);
   if (!res.ok) throw new Error("No data for this period");
   return res.json();
 }
