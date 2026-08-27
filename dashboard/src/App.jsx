@@ -75,6 +75,23 @@ export default function App() {
     return "";
   };
 
+  // How fresh is this row's price, compared to today? This is purely a
+  // display helper — separate from check_freshness.py's alerting logic,
+  // which only cares about multi-day silence. Here, showing "yesterday" is
+  // completely normal (the site hasn't published today's number yet), it's
+  // just useful for your uncle to see that at a glance before deciding
+  // whether to act on a price right now.
+  const freshness = (dateStr) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const rowDate = new Date(`${dateStr}T00:00:00`);
+    const daysAgo = Math.round((today - rowDate) / 86400000);
+
+    if (daysAgo <= 0) return { text: "Today", className: "fresh-today" };
+    if (daysAgo === 1) return { text: "Yesterday", className: "fresh-yesterday" };
+    return { text: `${daysAgo} days ago`, className: "fresh-stale" };
+  };
+
   // Still checking whether a session already exists (page just loaded)
   if (session === undefined) return <div className="center">Loading...</div>;
 
@@ -105,6 +122,7 @@ export default function App() {
           <tr>
             <th>Chemical</th>
             <th>Date</th>
+            <th>Status</th>
             <th>Price (CNY/t)</th>
             <th>Change</th>
             <th>Change %</th>
@@ -120,6 +138,11 @@ export default function App() {
             >
               <td>{displayName(chem)}</td>
               <td>{chem.date}</td>
+              <td>
+                <span className={`freshness-badge ${freshness(chem.date).className}`}>
+                  {freshness(chem.date).text}
+                </span>
+              </td>
               <td>{chem.price.toLocaleString()}</td>
               <td className={changeColor(chem.change_abs)}>
                 {chem.change_abs > 0 ? "+" : ""}{chem.change_abs}
