@@ -273,3 +273,26 @@ tbody tr.active {
   opacity: 0.6;
   cursor: default;
 }
+
+.freshness-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fresh-today {
+  background: rgba(76, 175, 80, 0.15);
+  color: #4caf50;
+}
+
+.fresh-yesterday {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+}
+
+.fresh-stale {
+  background: rgba(244, 67, 54, 0.15);
+  color: #f44336;
+}
