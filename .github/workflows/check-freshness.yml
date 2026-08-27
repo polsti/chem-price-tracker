@@ -1,0 +1,48 @@
+name: Daily freshness check
+
+on:
+  # Runs once a day, late — 22:00 Kyiv time (EEST, summer) = 19:00 UTC.
+  # In winter (EET, UTC+2) this effectively fires at 21:00 Kyiv — same
+  # daylight-saving caveat as the scrape schedule: a manual one-hour nudge
+  # twice a year if the exact hour matters.
+  #
+  # Running late in the day (not right after the morning scrape) matters
+  # here: chemicals publish their prices at different, sometimes late,
+  # times — checking at 22:00 gives the whole day a chance to complete
+  # before we decide anything is actually missing.
+  schedule:
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      # Fails (exits non-zero) if any chemical has gone 2+ real days without
+      # an update — that failure is what the next step below reacts to.
+      # No browser needed here (unlike the scraper) — this only reads from
+      # Supabase, so there's no Playwright install step in this workflow.
+      - name: Check for stale chemicals
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python check_freshness.py
+
+      # Only runs if the check above failed — silent on a normal day.
+      - name: Send Telegram alert on failure
+        if: failure()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="Chemical price tracker: some chemicals haven't updated in 2+ days. Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

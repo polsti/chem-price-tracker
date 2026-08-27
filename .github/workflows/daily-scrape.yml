@@ -1,12 +1,13 @@
 name: Daily chemical price scrape
 
 on:
-  # Runs automatically every day at 05:00 UTC = 08:00 Kyiv time (summer/EEST).
-  # In winter (EET, UTC+2) this will effectively fire at 07:00 Kyiv time —
-  # GitHub's schedule doesn't know about daylight saving, so this may need
-  # a manual one-hour nudge twice a year if the exact hour matters.
+  # Runs every 2 hours, all day — catches each chemical's price as soon as
+  # possible after the site publishes it, instead of waiting up to a full
+  # day for the next run. The freshness check + Telegram alert live in a
+  # separate workflow (check-freshness.yml) that runs once a day instead,
+  # so this frequent schedule doesn't turn into frequent alert spam.
   schedule:
-    - cron: '0 5 * * *'
+    - cron: '0 */2 * * *'
   # Adds a manual "Run workflow" button on GitHub, so we can trigger a run
   # on demand to test, instead of waiting for the next scheduled time.
   workflow_dispatch:
@@ -43,20 +44,3 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper.py
-
-      # Fails (exits non-zero) if today's price is missing for any chemical —
-      # that failure is what the next step below reacts to.
-      - name: Check today's data actually landed
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python check_freshness.py
-
-      # Only runs if an earlier step in this job failed (the scrape itself,
-      # or the freshness check above) — silent on a normal successful day.
-      - name: Send Telegram alert on failure
-        if: failure()
-        run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="Chemical price tracker: today's scrape run failed. Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
